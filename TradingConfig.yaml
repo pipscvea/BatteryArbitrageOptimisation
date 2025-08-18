@@ -1,0 +1,5 @@
+trading:
+  starting_balance: 10000  # Starting balance in GBP
+  transaction_fee: 0.01     # Transaction fee as a percentage of the trade value
+  max_trade_volume: 1000    # Maximum trade volume in GBP
+  min_trade_volume: 1     # Minimum trade volume in GBP

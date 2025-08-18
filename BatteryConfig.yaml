@@ -1,0 +1,9 @@
+battery: 
+  capacity_kwh: 1    # Battery capacity in MWh
+  max_charge_kw: 5      # Maximum charge rate
+  max_discharge_kw: 5 # Maximum discharge rate
+  efficiency: 0.9   # Efficiency of charge/discharge
+  soc_init: 0.5 # State of Charge (SOC) initial value
+  degradation_rate: 0.001 # per cycle
+
+
