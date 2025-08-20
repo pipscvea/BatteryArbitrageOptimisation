@@ -25,7 +25,8 @@ def merge_price_csvs(file_list, datetime_col='StartTime', price_col='SystemSellP
   merged_df = merged_df.drop_duplicates(subset=datetime_col)
   merged_df = merged_df.sort_values(by=datetime_col)
   merged_df.set_index(datetime_col, inplace=True)
-  
+  merged_df["SystemSellPrice"] = merged_df["SystemSellPrice"].mask(merged_df["SystemSellPrice"] == 0, (merged_df["SystemSellPrice"].shift() + merged_df["SystemSellPrice"].shift(-1)) / 2)
+
   return merged_df
 
 def merge_with_demand(price_df, demand_csv, datetime_col='StartTime', how='inner'):

@@ -2,8 +2,8 @@ import yaml
 import numpy as np
 import pandas as pd
 
-
 from train_data_assembly import train_data_assembly
+
 df = train_data_assembly()
 
 def load_config(filepath):
@@ -14,6 +14,7 @@ def load_config(filepath):
 # Load configuration files
 battery_cfg = load_config('BatteryConfig.yaml')
 trading_cfg = load_config('TradingConfig.yaml')
+
 # Extract battery parameters        
 battery_capacity = battery_cfg['battery']['capacity_kwh']
 max_charge_kw = battery_cfg['battery']['max_charge_kw']
@@ -21,10 +22,33 @@ max_discharge_kw = battery_cfg['battery']['max_discharge_kw']
 efficiency = battery_cfg['battery']['efficiency']
 soc_init = battery_cfg['battery']['soc_init']
 degradation_rate = battery_cfg['battery']['degradation_rate']
+
 # Extract trading parameters
 starting_balance = trading_cfg['trading']['starting_balance']
 transaction_fee = trading_cfg['trading']['transaction_fee']
 max_trade_volume = trading_cfg['trading']['max_trade_volume']
+
+
+# Track battery state
+charge = battery_capacity * soc_init    # start half full
+charge_list = []
+profit_list = []
+charge_sale_vol = 100
+Capacity_remaining = battery_capacity - charge
+
+# Buy/Sell 
+Strong = 0.2
+Mid = 0.15
+Weak = 0.1
+
+### Defining Buy/Sell vol
+StrongBuyVol =  Capacity_remaining * Strong
+MidBuyVol = Capacity_remaining * Mid
+WeakBuyVol = Capacity_remaining * Weak
+
+StrongSellVol = charge * Strong
+MidSellVol = charge * Mid
+WeakSellVol = charge * Weak
 
 #### Features
 
@@ -66,7 +90,7 @@ df["RollingVol"] = df["Return"].rolling(window=48).std() * np.sqrt(48) # Annuali
 df["RollingVol"]
 df.dropna()
 
-def ComplexMechanism(df=df):
+def StrongWeakMechanism(df=df):
     threshold = df["SystemSellPrice"].rolling(window=48).std().mean() * 0.3
     df['Action'] = np.where(df["SystemSellPrice"] < df["ssp_ma6"] - threshold*2, 'Strong Buy',
                             np.where(df["SystemSellPrice"] < df["ssp_ma6"] - threshold, 'Mid Buy',
@@ -78,7 +102,7 @@ def ComplexMechanism(df=df):
     return df['Action']
 
 
-df['Action'] = ComplexMechanism(df)
+df['Action'] = StrongWeakMechanism(df)
 
 X = df[['SystemSellPrice', 'ssp_lag1', 'ssp_lag2', 'ssp_ma6', 'hour', 'day_of_week', 'month',
          'is_weekend', 'Battery_Level', 'Demand_lag1', 'Demand_lag2', 'Demand_ma6', 'Demand_rolling_std_3',

@@ -4,6 +4,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
+from joblib import dump, load
 
 def train(X_train, y_train, X_test, y_test, param_grid=None, cv=5):
 
@@ -32,13 +33,12 @@ def train(X_train, y_train, X_test, y_test, param_grid=None, cv=5):
     grid_search.fit(X_train, y_train)
     
     best_model = grid_search.best_estimator_
+    dump(best_model, "refined_model1_2017_JantoMarch.joblib")
+
     print("Best parameters found:", grid_search.best_params_)
+    print("Best score:", grid_search.best_score_)
 
-    y_pred = best_model.predict(X_test)
-    report = classification_report(y_test, y_pred)
-    print(report)
-
-    return best_model, report
+    return best_model
 
 
 
