@@ -1,5 +1,6 @@
 trading:
-  starting_balance: 10000  # Starting balance in GBP
-  transaction_fee: 0.01     # Transaction fee as a percentage of the trade value
-  max_trade_volume: 1000    # Maximum trade volume in GBP
-  min_trade_volume: 1     # Minimum trade volume in GBP
+  starting_balance: 100000     # £ notional, used only to express returns as a percentage
+  transaction_cost_per_mwh: 0.5   # £ per MWh traded (fees/spread proxy)
+  # Minimum expected edge (£/MWh, net of efficiency + costs) required to open a trade.
+  # This is the commercial gate: below it, forecast signal is not worth acting on.
+  min_edge_per_mwh: 3.0
