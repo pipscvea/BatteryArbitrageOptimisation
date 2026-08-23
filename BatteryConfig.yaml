@@ -1,9 +1,13 @@
-battery: 
-  capacity_kwh: 1000    # Battery capacity in MWh
-  max_charge_kw: 5      # Maximum charge rate
-  max_discharge_kw: 5 # Maximum discharge rate
-  efficiency: 0.97   # Efficiency of charge/discharge
-  soc_init: 0.1 # State of Charge (SOC) initial value
-  degradation_rate: 0.001 # per cycle
+battery:
+  # All energy in kWh, all power in kW, consistently. (2 MWh / 1 MW = 0.5C system.)
+  capacity_kwh: 2000          # usable energy capacity
+  max_power_kw: 1000          # symmetric max charge / discharge power
+  efficiency_one_way: 0.95    # applied on charge AND on discharge (round-trip ~0.90)
+  soc_init: 0.50              # initial state of charge (fraction of capacity)
+  soc_min: 0.05               # do not discharge below this fraction
+  soc_max: 0.95               # do not charge above this fraction
+  degradation_cost_per_mwh: 2.0   # £ per MWh of throughput (proxy for cycle wear)
 
-
+market:
+  settlement_period_hours: 0.5    # UK settlement period = 30 min
+  periods_per_year: 17520         # 48 * 365, used to annualise risk metrics

@@ -1,0 +1,10 @@
+# Pinned to the versions the refactor was verified against.
+# The legacy refined_model1_*.joblib was trained on an older scikit-learn and is NOT
+# compatible with 1.6.x — retrain with training.py.
+scikit-learn==1.6.1
+pandas==2.3.3
+numpy==2.0.2
+PyYAML==6.0.3
+matplotlib==3.9.4
+joblib==1.5.3
+pytest==8.3.4

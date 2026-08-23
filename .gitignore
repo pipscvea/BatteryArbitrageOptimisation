@@ -9,3 +9,13 @@ Notebooks
 # TrainingData
 RollingSystemDemand
 SystemSellAndBuyPrices
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Trained model artifacts (retrain locally with training.py)
+forecast_regressor.joblib
+forecast_classifier.joblib
