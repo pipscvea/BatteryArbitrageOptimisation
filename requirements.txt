@@ -7,4 +7,5 @@ numpy==2.0.2
 PyYAML==6.0.3
 matplotlib==3.9.4
 joblib==1.5.3
+certifi==2024.8.30   # CA bundle for fetch_bmrs.py TLS verification on macOS
 pytest==8.3.4

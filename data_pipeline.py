@@ -66,7 +66,7 @@ def merge_driver(df: pd.DataFrame, driver_csv, value_cols, datetime_col: str = "
     return df.merge(d[value_cols], left_index=True, right_index=True, how=how).sort_index()
 
 
-def assemble_market_data(price_glob: str = "SystemSellAndBuyPrices-2017*.csv",
+def assemble_market_data(price_glob: str = "SystemSellAndBuyPrices-*.csv",
                          demand_csv: str | None = None) -> pd.DataFrame:
     """Build the base market frame: prices + demand, datetime-indexed."""
     price_files = glob.glob(str(PRICE_DIR / price_glob))

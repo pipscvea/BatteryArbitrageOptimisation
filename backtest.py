@@ -5,9 +5,9 @@ dataset, train + test). Here:
   * features look backward, the label looks forward (see features.py / labels.py)
   * the split is strictly chronological — train on the earlier window, evaluate ONLY on
     the later, unseen window
-  * the ML strategy is reported alongside a perfect-foresight upper bound and a naive
-    baseline, all on the SAME test window, so the headline is commercial value, not
-    forecast accuracy.
+  * the ML strategy is reported alongside a perfect-foresight *myopic* reference and a
+    naive baseline, all on the SAME test window, so the headline is commercial value, not
+    forecast accuracy. (A true optimal-dispatch upper bound via LP/DP is Stage 3 work.)
 
 Requires the market CSVs (see README) — will not run on the cloned repo alone. The
 plumbing is verified independently on synthetic data in tests/.
@@ -63,7 +63,7 @@ def run():
 
     strategies = {
         "ML forecast": model_requests(reg, X.loc[test_idx], df_test, batt, trade),
-        "Perfect foresight (upper bound)": benchmarks.perfect_foresight(df_test, batt, trade, HORIZON),
+        "Perfect-foresight myopic rule": benchmarks.perfect_foresight_myopic(df_test, batt, trade, HORIZON),
         "Naive time-of-day": benchmarks.naive_time_of_day(df_test, batt),
     }
 

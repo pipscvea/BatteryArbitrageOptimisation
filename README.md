@@ -40,12 +40,21 @@ pip install -r requirements.txt
 ```
 
 ### Market data (not committed)
-Place the UK Balancing Mechanism CSVs (e.g. from Elexon/BMRS) here:
+Fetch it directly from the **Elexon BMRS Insights API** (free, keyless):
+
+```bash
+python fetch_bmrs.py --from 2024-01-01 --to 2024-03-31
+```
+
+This writes the CSVs to the expected layout:
 
 ```
-SystemSellAndBuyPrices/SystemSellAndBuyPrices-2017*.csv   # StartTime, SystemSellPrice, SystemBuyPrice (£/MWh)
-RollingSystemDemand/RollingSystemDemand-*.csv             # StartTime, Demand (MW)
+SystemSellAndBuyPrices/SystemSellAndBuyPrices-<range>.csv  # StartTime, SystemSellPrice, SystemBuyPrice (£/MWh, DISEBSP)
+RollingSystemDemand/RollingSystemDemand-<range>.csv        # StartTime, Demand (MW, ITSDO from demand/outturn)
 ```
+
+Note: UK imbalance prices go **negative and zero**, so features avoid log returns
+(volatility is the trailing std of price changes).
 
 ## Run
 
@@ -55,7 +64,8 @@ python backtest.py     # honest out-of-sample backtest + benchmark comparison
 pytest -q              # verify the pipeline on synthetic data (no CSVs needed)
 ```
 
-`backtest.py` prints a strategy comparison table (ML vs perfect-foresight upper bound vs
+`backtest.py` prints a strategy comparison table (ML vs a perfect-foresight *myopic*
+reference — not a true optimal-dispatch bound — vs
 naïve baseline) with P&L, £/MWh, Sharpe, max drawdown and VaR, plus the top forecast
 drivers.
 
