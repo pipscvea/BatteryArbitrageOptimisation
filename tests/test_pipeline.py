@@ -67,7 +67,7 @@ def test_simulate_respects_soc_and_power_limits():
 
 def test_perfect_foresight_is_profitable_and_metrics_finite():
     df = make_market(days=30)
-    req = benchmarks.perfect_foresight(df, BATT, TRADE)
+    req = benchmarks.perfect_foresight_myopic(df, BATT, TRADE)
     m = evaluate(simulate(req, df["SystemSellPrice"], df["SystemBuyPrice"], BATT, TRADE), BATT)
     assert m.total_pnl > 0
     assert m.n_trades > 0
@@ -79,9 +79,19 @@ def test_perfect_foresight_is_profitable_and_metrics_finite():
 def test_perfect_foresight_dominates_doing_nothing():
     df = make_market(days=30)
     ssp, sbp = df["SystemSellPrice"], df["SystemBuyPrice"]
-    pf = evaluate(simulate(benchmarks.perfect_foresight(df, BATT, TRADE), ssp, sbp, BATT, TRADE), BATT)
+    pf = evaluate(simulate(benchmarks.perfect_foresight_myopic(df, BATT, TRADE), ssp, sbp, BATT, TRADE), BATT)
     hold = evaluate(simulate(pd.Series(0.0, index=df.index), ssp, sbp, BATT, TRADE), BATT)
     assert pf.total_pnl > hold.total_pnl
+
+
+def test_features_survive_negative_prices():
+    """UK imbalance prices go negative/zero — features must stay finite (no log blow-up)."""
+    df = make_market(days=10, seed=2)
+    df["SystemSellPrice"] -= 60.0  # push a chunk of prices below zero
+    df["SystemBuyPrice"] -= 60.0
+    feats = build_features(df)[FEATURE_COLUMNS]
+    warm = feats.iloc[48:]  # past the rolling-window warm-up
+    assert np.isfinite(warm.to_numpy()).all()
 
 
 def test_decision_gates_on_min_edge():

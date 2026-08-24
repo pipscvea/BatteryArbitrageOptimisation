@@ -8,14 +8,13 @@ evaluation honest.
 """
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 
 # Features consumed by the forecasting model. All are known at decision time t.
 FEATURE_COLUMNS = [
     "SystemSellPrice", "SystemBuyPrice", "spread",
     "ssp_lag1", "ssp_lag2", "ssp_ma6", "sbp_ma6",
-    "ssp_rolling_mean_48", "ssp_rolling_std_3", "rolling_vol_48",
+    "ssp_rolling_mean_48", "ssp_rolling_std_3", "price_vol_48",
     "Demand", "Demand_lag1", "Demand_lag2", "Demand_ma6", "Demand_rolling_std_3",
     "hour", "day_of_week", "month", "is_weekend",
 ]
@@ -37,11 +36,11 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     out["ssp_rolling_std_3"] = out["SystemSellPrice"].rolling(3).std()
     out["spread"] = out["SystemBuyPrice"] - out["SystemSellPrice"]
 
-    # Volatility from log returns of the mid price (trailing window).
-    eps = 1e-6
+    # Volatility as the trailing std of absolute price changes (£/MWh). Uses first
+    # differences, not log returns, because UK imbalance prices go negative and zero
+    # (log returns are undefined there).
     mid = (out["SystemSellPrice"] + out["SystemBuyPrice"]) / 2
-    log_ret = np.log(mid / mid.shift(1) + eps)
-    out["rolling_vol_48"] = log_ret.rolling(48).std() * np.sqrt(48)
+    out["price_vol_48"] = mid.diff().rolling(48).std()
 
     # Demand features.
     out["Demand_lag1"] = out["Demand"].shift(1)
