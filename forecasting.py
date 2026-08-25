@@ -57,6 +57,18 @@ def train_regressor(X_train, y_train, param_grid=None, n_splits=4,
     return best, grid.best_params_, grid.best_score_
 
 
+def fit_regressor(X_train, y_train, n_estimators: int = 200, max_depth=None,
+                  min_samples_leaf: int = 4):
+    """Fast single-fit regressor (no grid search) — used inside the hyperparameter sweep
+    where re-running GridSearchCV per candidate would be prohibitively slow."""
+    model = RandomForestRegressor(
+        n_estimators=n_estimators, max_depth=max_depth,
+        min_samples_leaf=min_samples_leaf, max_features="sqrt",
+        random_state=42, n_jobs=-1)
+    model.fit(X_train, y_train)
+    return model
+
+
 def feature_importances(model, feature_names):
     """Stage 2 attribution hook: rank drivers by importance to answer *why* the model
     predicted a move. (For rigorous attribution, swap in SHAP later.)"""

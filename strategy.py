@@ -13,17 +13,19 @@ from decision import decide
 
 
 def model_requests(model, X: pd.DataFrame, df: pd.DataFrame,
-                   batt: BatteryConfig, trade: TradingConfig) -> pd.Series:
+                   batt: BatteryConfig, trade: TradingConfig,
+                   size_scale: float = 0.0) -> pd.Series:
     """Predict forward price change from ``X`` and convert each to a signed request.
 
     ``X`` and ``df`` share the same (test) index. Returns battery-side kWh requests.
+    ``size_scale`` enables confidence-proportional sizing (see ``decision.decide``).
     """
     forecast = pd.Series(model.predict(X), index=X.index)
     reqs = {
         t: decide(float(forecast.loc[t]),
                   float(df["SystemSellPrice"].loc[t]),
                   float(df["SystemBuyPrice"].loc[t]),
-                  batt, trade).request_kwh
+                  batt, trade, size_scale=size_scale).request_kwh
         for t in X.index
     }
     return pd.Series(reqs).reindex(X.index).fillna(0.0)
