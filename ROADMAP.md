@@ -55,7 +55,11 @@ Sharpe X, max drawdown X%, Y% over benchmark." **Do not manufacture numbers.**
 Compare strategies: naïve forecast, statistical, ML, optimisation, benchmark battery.
 
 Status: `evaluate.py` computes P&L, £/MWh, Sharpe, drawdown, hit rate.
-`benchmarks.py` provides perfect-foresight upper bound + naïve rule baselines.
+`benchmarks.py` provides a perfect-foresight *myopic* reference + naïve baseline.
+`robustness.py` runs an **expanding-window walk-forward across every quarter** — on
+2 years of real data (2023Q2–2024Q4) the ML strategy is profitable in 7/7 quarters,
+beats naïve in 6/7, and captures ~72% of the myopic-perfect ceiling, with 2024Q1 a
+clear weak regime (10% capture). Still to compare: statistical vs ML vs optimisation.
 
 ### 5. Risk analysis
 Beyond P&L: volatility, max drawdown, downside risk, exposure, VaR, stress scenarios,

@@ -65,9 +65,14 @@ Note: UK imbalance prices go **negative and zero**, so features avoid log return
 
 ```bash
 python training.py     # train + persist forecast models on the training window
-python backtest.py     # honest out-of-sample backtest + benchmark comparison
+python backtest.py     # single-window tuned out-of-sample backtest + benchmark comparison
+python robustness.py   # expanding-window walk-forward across every quarter (+ plot in figs/)
 pytest -q              # verify the pipeline on synthetic data (no CSVs needed)
 ```
+
+`robustness.py` is the credibility run: it walks forward quarter by quarter (train on all
+prior data, test on the quarter) and reports per-quarter and aggregate P&L / Sharpe /
+drawdown / capture-vs-benchmark, saving a plot to `figs/robustness_walkforward.png`.
 
 `backtest.py` prints a strategy comparison table (ML vs a perfect-foresight *myopic*
 reference — not a true optimal-dispatch bound — vs
