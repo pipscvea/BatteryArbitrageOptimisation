@@ -23,6 +23,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent
 PRICE_DIR = ROOT / "SystemSellAndBuyPrices"
 DEMAND_DIR = ROOT / "RollingSystemDemand"
+DRIVERS_DIR = ROOT / "Drivers"
 
 
 def merge_price_csvs(file_list, datetime_col: str = "StartTime") -> pd.DataFrame:
@@ -78,4 +79,15 @@ def assemble_market_data(price_glob: str = "SystemSellAndBuyPrices-*.csv",
                 f"No demand CSV found under {DEMAND_DIR} (see README)."
             )
         demand_csv = candidates[0]
-    return merge_with_demand(prices, demand_csv)
+    merged = merge_with_demand(prices, demand_csv)
+
+    # Stage 2 fundamental drivers — merged if fetched, otherwise silently skipped so the
+    # price-only pipeline still runs.
+    driver_files = sorted(DRIVERS_DIR.glob("Drivers-*.csv"))
+    if driver_files:
+        drivers = pd.concat(
+            [pd.read_csv(f, parse_dates=["StartTime"]) for f in driver_files],
+            ignore_index=True,
+        ).drop_duplicates(subset="StartTime").set_index("StartTime").sort_index()
+        merged = merged.merge(drivers, left_index=True, right_index=True, how="left")
+    return merged.sort_index()

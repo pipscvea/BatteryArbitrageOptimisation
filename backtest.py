@@ -17,7 +17,7 @@ from sklearn.metrics import roc_auc_score
 
 from config import load_battery_config, load_trading_config
 from data_pipeline import assemble_market_data
-from features import FEATURE_COLUMNS, build_features
+from features import active_feature_columns, build_features
 from labels import forward_price_change, tradeable_move
 from forecasting import train_regressor, train_classifier, feature_importances
 from strategy import model_requests
@@ -39,7 +39,8 @@ def run():
     batt, trade = load_battery_config(), load_trading_config()
     df = assemble_market_data()
     feats = build_features(df)
-    valid_idx = feats.index[feats[FEATURE_COLUMNS].notna().all(axis=1)]
+    cols = active_feature_columns(feats)
+    valid_idx = feats.index[feats[cols].notna().all(axis=1)]
     train_idx, val_idx, test_idx = three_way_split(valid_idx)
 
     # Stage 3 tuning on validation (never on test).
@@ -52,7 +53,7 @@ def run():
 
     # Final fit on train+validation at the chosen horizon; evaluate on test only.
     fit_idx = train_idx.union(val_idx)
-    X = feats[FEATURE_COLUMNS]
+    X = feats[cols]
     y_change = forward_price_change(df, best.horizon)
     y_move = tradeable_move(df, batt.efficiency_one_way, 0.0, best.horizon)
     fit_valid = fit_idx[y_change.loc[fit_idx].notna()]
@@ -78,7 +79,7 @@ def run():
               f"{m.sharpe_annualised:>9.2f}{m.max_drawdown:>8.2%}{m.var_95_per_period:>10,.0f}")
 
     print("\nTop forecast drivers (Stage 2 attribution):")
-    print(feature_importances(reg, FEATURE_COLUMNS).head(6).to_string())
+    print(feature_importances(reg, cols).head(8).to_string())
 
 
 if __name__ == "__main__":

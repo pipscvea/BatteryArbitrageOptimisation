@@ -32,9 +32,12 @@ demand, wind/solar generation, interconnector flows, system imbalance, gas price
 carbon, temperature/weather, outages, historical price behaviour.
 Then ask: *why* did the model predict this move? (feature attribution).
 
-Status: `features.py` builds price/demand/time features today and exposes a documented
-extension point (`add_driver_features`) for the fundamental drivers above once their
-data is sourced. Attribution hook noted in `forecasting.py`.
+Status: `features.py` builds price/demand/time features plus, when fetched, **wind
+(level/lags/ramp), net interconnector flow and gas/CCGT** (`fetch_bmrs.fetch_generation`
+→ `Drivers/` → `add_driver_features`). Wind is negatively correlated with price as
+expected. On a single Q1-2024 window these add negligible P&L over price/demand/time —
+the imbalance price is highly autoregressive short-term — a finding to re-test across
+regimes. Still to add: solar, carbon, weather, outages; SHAP attribution.
 
 ### 3. Convert forecast → trading decision
 Not `forecast = £X/MWh`, but `forecast distribution → expected opportunity → optimal action`,

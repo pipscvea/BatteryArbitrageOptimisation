@@ -51,7 +51,12 @@ This writes the CSVs to the expected layout:
 ```
 SystemSellAndBuyPrices/SystemSellAndBuyPrices-<range>.csv  # StartTime, SystemSellPrice, SystemBuyPrice (£/MWh, DISEBSP)
 RollingSystemDemand/RollingSystemDemand-<range>.csv        # StartTime, Demand (MW, ITSDO from demand/outturn)
+Drivers/Drivers-<range>.csv                                # StartTime, Wind, InterconnectorNet, Gas (MW, FUELINST @30min)
 ```
+
+Stage 2 driver features (wind + lags/ramp, net interconnector flow, gas/CCGT) are merged
+and engineered automatically when the `Drivers/` CSVs are present, and silently skipped
+otherwise. Wind is the dominant short-term price driver (negatively correlated with price).
 
 Note: UK imbalance prices go **negative and zero**, so features avoid log returns
 (volatility is the trailing std of price changes).

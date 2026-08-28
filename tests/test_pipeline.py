@@ -84,6 +84,19 @@ def test_perfect_foresight_dominates_doing_nothing():
     assert pf.total_pnl > hold.total_pnl
 
 
+def test_driver_features_added_only_when_present():
+    """Wind/gas/interconnector features appear iff the raw driver columns are merged."""
+    from features import active_feature_columns
+    df = make_market(days=5)
+    assert "wind_ma6" not in active_feature_columns(build_features(df))  # no drivers
+    df2 = df.copy()
+    df2["Wind"] = 8000.0
+    df2["InterconnectorNet"] = 1000.0
+    df2["Gas"] = 5000.0
+    cols = active_feature_columns(build_features(df2))
+    assert {"Wind", "wind_lag1", "wind_ma6", "wind_ramp", "InterconnectorNet", "Gas"} <= set(cols)
+
+
 def test_features_survive_negative_prices():
     """UK imbalance prices go negative/zero — features must stay finite (no log blow-up)."""
     df = make_market(days=10, seed=2)
