@@ -18,9 +18,10 @@ from sklearn.metrics import roc_auc_score
 from config import load_battery_config, load_trading_config
 from data_pipeline import assemble_market_data
 from features import active_feature_columns, build_features
-from labels import forward_price_change, tradeable_move
-from forecasting import train_regressor, train_classifier, feature_importances
+from labels import forward_price_change, tradeable_move, forward_price_path
+from forecasting import train_regressor, train_classifier, feature_importances, fit_path_regressor
 from strategy import model_requests
+from mpc import mpc_requests
 from simulate import simulate
 from evaluate import evaluate
 from tuning import sweep
@@ -28,6 +29,7 @@ from optimize import optimal_dispatch
 import benchmarks
 
 TRAIN_FRAC, VAL_FRAC = 0.6, 0.2  # remainder is test
+MPC_WINDOW, MPC_REPLAN = 48, 12  # 1-day lookahead, re-plan every 6 h
 
 
 def three_way_split(index: pd.Index):
@@ -62,11 +64,18 @@ def run():
     clf, _, _ = train_classifier(X.loc[fit_valid], y_move.loc[fit_valid])
     auc = roc_auc_score(y_move.loc[test_idx], clf.predict_proba(X.loc[test_idx])[:, 1])
 
+    # Price-path model for MPC (drop tail rows lacking a full forward path).
+    Y_path = forward_price_path(df, MPC_WINDOW)
+    path_valid = fit_idx[Y_path.loc[fit_idx].notna().all(axis=1)]
+    path_model = fit_path_regressor(X.loc[path_valid], Y_path.loc[path_valid])
+
     df_test = df.loc[test_idx]
     ssp, sbp = df_test["SystemSellPrice"], df_test["SystemBuyPrice"]
     strategies = {
-        "ML forecast (tuned)": model_requests(reg, X.loc[test_idx], df_test, batt, trade,
+        "ML forecast (myopic heuristic)": model_requests(reg, X.loc[test_idx], df_test, batt, trade,
                                               size_scale=best.size_scale),
+        "MPC (forecast + rolling LP)": mpc_requests(path_model, X.loc[test_idx], df_test,
+                                              batt, trade, MPC_WINDOW, MPC_REPLAN),
         "LP optimum (true upper bound)": optimal_dispatch(df_test, batt, trade),
         "Perfect-foresight myopic rule": benchmarks.perfect_foresight_myopic(
             df_test, batt, trade, best.horizon),

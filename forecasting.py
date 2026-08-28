@@ -69,6 +69,18 @@ def fit_regressor(X_train, y_train, n_estimators: int = 200, max_depth=None,
     return model
 
 
+def fit_path_regressor(X_train, Y_train, n_estimators: int = 200, max_depth=None,
+                       min_samples_leaf: int = 4):
+    """Multi-output regressor for the MPC price path (RandomForest is natively
+    multi-output). ``Y_train`` is the (n, window) matrix from labels.forward_price_path."""
+    model = RandomForestRegressor(
+        n_estimators=n_estimators, max_depth=max_depth,
+        min_samples_leaf=min_samples_leaf, max_features="sqrt",
+        random_state=42, n_jobs=-1)
+    model.fit(X_train, Y_train)
+    return model
+
+
 def feature_importances(model, feature_names):
     """Stage 2 attribution hook: rank drivers by importance to answer *why* the model
     predicted a move. (For rigorous attribution, swap in SHAP later.)"""

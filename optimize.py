@@ -27,45 +27,43 @@ from scipy.optimize import linprog
 from config import BatteryConfig, TradingConfig
 
 
-def optimal_dispatch(df: pd.DataFrame, batt: BatteryConfig, trade: TradingConfig) -> pd.Series:
-    """Return the optimal signed request Series (battery-side kWh; + charge / - discharge)
-    to feed ``simulate.simulate``."""
-    idx = df.index
-    T = len(idx)
+def solve_dispatch(p_sell, p_buy, soc0: float, batt: BatteryConfig, trade: TradingConfig):
+    """Core LP. Given price arrays and an initial SoC (kWh), return battery-side
+    ``(a, r)`` arrays (charge / discharge energy per period). Reused by the full-window
+    optimum (real prices) and by MPC (forecast prices over a rolling window)."""
+    p_sell = np.asarray(p_sell, dtype=float)
+    p_buy = np.asarray(p_buy, dtype=float)
+    T = len(p_sell)
     if T == 0:
-        return pd.Series(dtype=float)
+        return np.array([]), np.array([])
 
-    p_sell = df["SystemSellPrice"].to_numpy(dtype=float)
-    p_buy = df["SystemBuyPrice"].to_numpy(dtype=float)
     eff = batt.efficiency_one_way
     costs = trade.transaction_cost_per_mwh + batt.degradation_cost_per_mwh
     max_step = batt.max_energy_per_period_kwh
-    soc0 = batt.capacity_kwh * batt.soc_init
     lo, hi = batt.capacity_kwh * batt.soc_min, batt.capacity_kwh * batt.soc_max
     p_final = p_sell[-1]
 
     # Per-unit profit (£ per kWh battery-side). /1000 converts kWh -> MWh for pricing.
-    # charge a_t: pay (p_buy+costs)/eff per MWh grid; terminal value +eff*p_final.
     prof_a = (-(p_buy + costs) / eff + eff * p_final) / 1000.0
-    # discharge r_t: receive eff*(p_sell-costs) per MWh; terminal value -eff*p_final.
     prof_r = (eff * (p_sell - costs) - eff * p_final) / 1000.0
     c = -np.concatenate([prof_a, prof_r])  # linprog minimises
 
-    # Cumulative SoC bounds: L is lower-triangular ones (prefix sums).
     L = sparse.tril(np.ones((T, T)))
-    # upper:  L a - L r <=  hi - soc0
-    # lower: -L a + L r <=  soc0 - lo
-    A_ub = sparse.vstack([
-        sparse.hstack([L, -L]),
-        sparse.hstack([-L, L]),
-    ]).tocsr()
+    A_ub = sparse.vstack([sparse.hstack([L, -L]), sparse.hstack([-L, L])]).tocsr()
     b_ub = np.concatenate([np.full(T, hi - soc0), np.full(T, soc0 - lo)])
 
     bounds = [(0.0, max_step)] * (2 * T)
     res = linprog(c, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method="highs")
     if not res.success:
         raise RuntimeError(f"LP dispatch failed: {res.message}")
+    return res.x[:T], res.x[T:]
 
-    a = res.x[:T]
-    r = res.x[T:]
-    return pd.Series(a - r, index=idx)
+
+def optimal_dispatch(df: pd.DataFrame, batt: BatteryConfig, trade: TradingConfig) -> pd.Series:
+    """Full-window perfect-foresight optimum: the true upper bound. Returns a signed
+    request Series (battery-side kWh; + charge / - discharge) for ``simulate.simulate``."""
+    if df.empty:
+        return pd.Series(dtype=float)
+    a, r = solve_dispatch(df["SystemSellPrice"], df["SystemBuyPrice"],
+                          batt.capacity_kwh * batt.soc_init, batt, trade)
+    return pd.Series(a - r, index=df.index)
