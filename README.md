@@ -67,6 +67,7 @@ Note: UK imbalance prices go **negative and zero**, so features avoid log return
 python training.py     # train + persist forecast models on the training window
 python backtest.py     # single-window tuned out-of-sample backtest + benchmark comparison
 python robustness.py   # expanding-window walk-forward across every quarter (+ plot in figs/)
+python risk.py         # Stage 5 risk report: tail metrics, forecast-error sensitivity, regime stress
 pytest -q              # verify the pipeline on synthetic data (no CSVs needed)
 ```
 

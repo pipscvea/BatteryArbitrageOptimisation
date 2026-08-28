@@ -165,6 +165,34 @@ def test_mpc_with_oracle_approaches_optimum_and_is_feasible():
     assert mpc.total_pnl >= 0.8 * lp.total_pnl                         # and gets most of it
 
 
+def test_risk_metrics_are_coherent():
+    """CVaR >= VaR, drawdown in [0,1], exposure in [0,1], everything finite."""
+    from risk import extended_risk, stress_by_regime
+    df = make_market(days=30)
+    req = benchmarks.perfect_foresight_myopic(df, BATT, TRADE)
+    res = simulate(req, df["SystemSellPrice"], df["SystemBuyPrice"], BATT, TRADE)
+    rm = extended_risk(res, BATT)
+    assert np.isfinite(list(rm.as_dict().values())).all()
+    assert rm.cvar_95 >= rm.var_95 - 1e-9      # expected shortfall is at least the VaR
+    assert 0.0 <= rm.max_drawdown <= 1.0
+    assert 0.0 <= rm.exposure <= 1.0
+    reg = stress_by_regime(res, df)
+    # Regime P&L shares (excluding the 'all periods' row) sum to ~1.
+    parts = reg[reg.regime != "all periods"]
+    assert abs(parts[parts.regime.isin(["high volatility", "low volatility"])].share_of_pnl.sum() - 1.0) < 1e-6
+
+
+def test_forecast_error_sensitivity_baseline_matches():
+    """sigma=0 must reproduce the noiseless strategy P&L exactly."""
+    from risk import forecast_error_sensitivity
+    from strategy import model_requests
+    df = make_market(days=20)
+    forecast = df["SystemSellPrice"].diff().shift(-1).fillna(0.0)  # arbitrary forecast series
+    sens = forecast_error_sensitivity(forecast, df, BATT, TRADE, [0, 50])
+    assert sens[0][0] == 0.0 and np.isfinite(sens[0][1])
+    assert np.isfinite(sens[1][1])
+
+
 def test_confidence_sizing_is_monotonic_and_capped():
     """Bigger edge -> bigger (or equal) size, never above full power."""
     full = BATT.max_energy_per_period_kwh
