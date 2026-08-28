@@ -74,10 +74,11 @@ pytest -q              # verify the pipeline on synthetic data (no CSVs needed)
 prior data, test on the quarter) and reports per-quarter and aggregate P&L / Sharpe /
 drawdown / capture-vs-benchmark, saving a plot to `figs/robustness_walkforward.png`.
 
-`backtest.py` prints a strategy comparison table (ML vs a perfect-foresight *myopic*
-reference — not a true optimal-dispatch bound — vs
-naïve baseline) with P&L, £/MWh, Sharpe, max drawdown and VaR, plus the top forecast
-drivers.
+`backtest.py` prints a strategy comparison table — ML vs the **LP optimum** (perfect-
+foresight optimal dispatch, `optimize.py`, a genuine upper bound), the perfect-foresight
+*myopic* reference, and the naïve baseline — with P&L, £/MWh, Sharpe, max drawdown and
+VaR, plus the top forecast drivers. Capture-vs-LP is the honest "how much of the
+achievable value did the forecast get?" metric.
 
 ## Configuration
 - `BatteryConfig.yaml` — capacity/power/efficiency/SoC limits/degradation (consistent kWh & kW).

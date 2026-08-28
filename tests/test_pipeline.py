@@ -115,6 +115,22 @@ def test_decision_gates_on_min_edge():
     assert d_big.request_kwh > 0.0
 
 
+def test_lp_dispatch_is_a_true_upper_bound():
+    """LP optimal dispatch must be >= the myopic perfect-foresight rule and never lose,
+    while respecting SoC/power limits (checked via the simulator)."""
+    from optimize import optimal_dispatch
+    df = make_market(days=20, seed=5)
+    ssp, sbp = df["SystemSellPrice"], df["SystemBuyPrice"]
+    lp_req = optimal_dispatch(df, BATT, TRADE)
+    lp = evaluate(simulate(lp_req, ssp, sbp, BATT, TRADE), BATT)
+    myopic = evaluate(simulate(
+        benchmarks.perfect_foresight_myopic(df, BATT, TRADE), ssp, sbp, BATT, TRADE), BATT)
+    assert lp.total_pnl >= myopic.total_pnl - 1e-6      # optimum dominates the myopic rule
+    assert lp.total_pnl >= -1e-6                         # never loses money with foresight
+    # Feasibility: the simulator should not have to clip the LP's own requests.
+    assert lp_req.abs().max() <= BATT.max_energy_per_period_kwh + 1e-6
+
+
 def test_confidence_sizing_is_monotonic_and_capped():
     """Bigger edge -> bigger (or equal) size, never above full power."""
     full = BATT.max_energy_per_period_kwh

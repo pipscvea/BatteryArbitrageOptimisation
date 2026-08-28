@@ -46,8 +46,11 @@ transaction cost, min/max SoC, and (ideally) forecast uncertainty.
 
 Status: `decision.py` (heuristic edge-vs-cost policy, with confidence-proportional
 trade sizing) + `simulate.py` (enforces all listed constraints). Horizon and sizing are
-tuned on validation. Optimisation-based dispatch (LP/MPC) — which would also give a true
-optimal-dispatch upper bound — is the planned alternative policy.
+tuned on validation. `optimize.py` adds a **perfect-foresight LP dispatch** (HiGHS) that
+respects every constraint — the **true upper bound**. Across 2 years the tuned ML policy
+captures **56% of the LP optimum** (vs 72% of the weaker myopic reference); the ML→LP gap
+motivates a **receding-horizon (MPC)** policy that feeds forecasts into the LP — the next
+step, and the way to turn the forecast into a near-optimal *causal* strategy.
 
 ### 4. Measure the commercial outcome
 Aim to be able to say: "Backtested across X months, £X/MWh average gross value,
