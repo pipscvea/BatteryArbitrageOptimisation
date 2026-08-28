@@ -24,6 +24,7 @@ from strategy import model_requests
 from simulate import simulate
 from evaluate import evaluate
 from tuning import sweep
+from optimize import optimal_dispatch
 import benchmarks
 
 TRAIN_FRAC, VAL_FRAC = 0.6, 0.2  # remainder is test
@@ -66,6 +67,7 @@ def run():
     strategies = {
         "ML forecast (tuned)": model_requests(reg, X.loc[test_idx], df_test, batt, trade,
                                               size_scale=best.size_scale),
+        "LP optimum (true upper bound)": optimal_dispatch(df_test, batt, trade),
         "Perfect-foresight myopic rule": benchmarks.perfect_foresight_myopic(
             df_test, batt, trade, best.horizon),
         "Naive time-of-day": benchmarks.naive_time_of_day(df_test, batt),

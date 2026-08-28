@@ -2,6 +2,7 @@
 # The legacy refined_model1_*.joblib was trained on an older scikit-learn and is NOT
 # compatible with 1.6.x — retrain with training.py.
 scikit-learn==1.6.1
+scipy==1.13.1        # linprog (HiGHS) for optimize.py LP dispatch
 pandas==2.3.3
 numpy==2.0.2
 PyYAML==6.0.3

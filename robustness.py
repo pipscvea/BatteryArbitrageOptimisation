@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 import benchmarks
+from optimize import optimal_dispatch
 from config import load_battery_config, load_trading_config
 from data_pipeline import assemble_market_data
 from evaluate import evaluate
@@ -41,9 +42,10 @@ class QuarterResult:
     ml_sharpe: float
     ml_maxdd: float
     ml_var95: float
-    perfect_pnl: float
+    lp_pnl: float        # LP perfect-foresight optimum — the TRUE upper bound
+    myopic_pnl: float    # myopic perfect-foresight reference
     naive_pnl: float
-    capture: float   # ml_pnl / perfect_pnl (share of achievable value)
+    capture: float       # ml_pnl / lp_pnl (share of the achievable optimum)
 
 
 def run():
@@ -75,7 +77,9 @@ def run():
         ml_req = model_requests(model, X.loc[test_idx], dft, batt, trade)
         ml_sim = simulate(ml_req, ssp, sbp, batt, trade)
         ml = evaluate(ml_sim, batt)
-        perfect = evaluate(simulate(
+        lp = evaluate(simulate(
+            optimal_dispatch(dft, batt, trade), ssp, sbp, batt, trade), batt)
+        myopic = evaluate(simulate(
             benchmarks.perfect_foresight_myopic(dft, batt, trade, HORIZON), ssp, sbp, batt, trade), batt)
         naive = evaluate(simulate(
             benchmarks.naive_time_of_day(dft, batt), ssp, sbp, batt, trade), batt)
@@ -83,9 +87,9 @@ def run():
         results.append(QuarterResult(
             quarter=str(q), periods=len(test_idx),
             ml_pnl=ml.total_pnl, ml_sharpe=ml.sharpe_annualised, ml_maxdd=ml.max_drawdown,
-            ml_var95=ml.var_95_per_period, perfect_pnl=perfect.total_pnl,
+            ml_var95=ml.var_95_per_period, lp_pnl=lp.total_pnl, myopic_pnl=myopic.total_pnl,
             naive_pnl=naive.total_pnl,
-            capture=(ml.total_pnl / perfect.total_pnl) if perfect.total_pnl > 0 else float("nan"),
+            capture=(ml.total_pnl / lp.total_pnl) if lp.total_pnl > 0 else float("nan"),
         ))
         # Collect per-period P&L increments; cumsum across quarters gives a continuous
         # curve. Zero the first period of each quarter (it only revalues the identical
@@ -103,26 +107,28 @@ def run():
 def _report(results):
     print(f"\nWalk-forward by quarter (expanding window, horizon={HORIZON}):\n")
     hdr = f"{'quarter':>8}{'periods':>8}{'ML P&L':>10}{'Sharpe':>8}{'MaxDD':>8}" \
-          f"{'perfect':>10}{'naive':>9}{'capture':>9}"
+          f"{'LP opt':>10}{'myopic':>10}{'naive':>9}{'capture':>9}"
     print(hdr)
     for r in results:
         print(f"{r.quarter:>8}{r.periods:>8}{r.ml_pnl:>10,.0f}{r.ml_sharpe:>8.2f}"
-              f"{r.ml_maxdd:>8.2%}{r.perfect_pnl:>10,.0f}{r.naive_pnl:>9,.0f}{r.capture:>9.0%}")
+              f"{r.ml_maxdd:>8.2%}{r.lp_pnl:>10,.0f}{r.myopic_pnl:>10,.0f}"
+              f"{r.naive_pnl:>9,.0f}{r.capture:>9.0%}")
 
     if not results:
         print("(no quarters with enough history)")
         return
     ml_total = sum(r.ml_pnl for r in results)
-    perfect_total = sum(r.perfect_pnl for r in results)
+    lp_total = sum(r.lp_pnl for r in results)
     beats_naive = sum(r.ml_pnl > r.naive_pnl for r in results)
     profitable = sum(r.ml_pnl > 0 for r in results)
     print(f"\nAggregate over {len(results)} quarters:")
-    print(f"  ML total P&L         £{ml_total:,.0f}")
-    print(f"  Capture vs perfect   {ml_total / perfect_total:.0%}" if perfect_total else "")
-    print(f"  Profitable quarters  {profitable}/{len(results)}")
-    print(f"  Beats naive          {beats_naive}/{len(results)}")
-    print(f"  Mean quarter Sharpe  {sum(r.ml_sharpe for r in results) / len(results):.2f}")
-    print(f"  Worst quarter P&L    £{min(r.ml_pnl for r in results):,.0f}")
+    print(f"  ML total P&L            £{ml_total:,.0f}")
+    print(f"  LP optimum (ceiling)    £{lp_total:,.0f}")
+    print(f"  Capture vs LP optimum   {ml_total / lp_total:.0%}" if lp_total else "")
+    print(f"  Profitable quarters     {profitable}/{len(results)}")
+    print(f"  Beats naive             {beats_naive}/{len(results)}")
+    print(f"  Mean quarter Sharpe     {sum(r.ml_sharpe for r in results) / len(results):.2f}")
+    print(f"  Worst quarter P&L       £{min(r.ml_pnl for r in results):,.0f}")
 
 
 def _plot(results, ml_equity_pieces):
@@ -135,7 +141,8 @@ def _plot(results, ml_equity_pieces):
     fig, ax = plt.subplots(1, 2, figsize=(14, 5))
     quarters = [r.quarter for r in results]
     ax[0].bar(quarters, [r.ml_pnl for r in results], color="steelblue", label="ML")
-    ax[0].plot(quarters, [r.perfect_pnl for r in results], "o--", color="green", label="perfect (myopic)")
+    ax[0].plot(quarters, [r.lp_pnl for r in results], "o--", color="green", label="LP optimum")
+    ax[0].plot(quarters, [r.myopic_pnl for r in results], "^:", color="darkorange", label="perfect (myopic)")
     ax[0].plot(quarters, [r.naive_pnl for r in results], "s--", color="grey", label="naive")
     ax[0].axhline(0, color="black", lw=0.8)
     ax[0].set_title(f"Out-of-sample P&L by quarter (walk-forward, h={HORIZON})")
