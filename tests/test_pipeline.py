@@ -131,6 +131,40 @@ def test_lp_dispatch_is_a_true_upper_bound():
     assert lp_req.abs().max() <= BATT.max_energy_per_period_kwh + 1e-6
 
 
+def test_mpc_with_oracle_approaches_optimum_and_is_feasible():
+    """With a perfect price-path forecast, MPC should beat the myopic rule and come
+    close to the LP optimum, while respecting power limits."""
+    from optimize import optimal_dispatch
+    from mpc import mpc_requests
+    W = 48
+    df = make_market(days=20, seed=7)
+    ssp, sbp = df["SystemSellPrice"], df["SystemBuyPrice"]
+
+    # Oracle path model: returns the TRUE forward change matrix (tail-padded with 0).
+    cur = ssp.to_numpy()
+    T = len(cur)
+    truth = np.zeros((T, W))
+    for k in range(1, W + 1):
+        shifted = np.concatenate([cur[k:], np.zeros(k)])
+        truth[:, k - 1] = shifted - cur
+
+    class Oracle:
+        def predict(self, _X):
+            return truth
+
+    X = df[["SystemSellPrice"]]  # features unused by the oracle
+    req = mpc_requests(Oracle(), X, df, BATT, TRADE, window=W, replan_every=12)
+    mpc = evaluate(simulate(req, ssp, sbp, BATT, TRADE), BATT)
+    lp = evaluate(simulate(optimal_dispatch(df, BATT, TRADE), ssp, sbp, BATT, TRADE), BATT)
+    myopic = evaluate(simulate(
+        benchmarks.perfect_foresight_myopic(df, BATT, TRADE), ssp, sbp, BATT, TRADE), BATT)
+
+    assert req.abs().max() <= BATT.max_energy_per_period_kwh + 1e-6   # feasible
+    assert mpc.total_pnl >= myopic.total_pnl - 1e-6                    # non-myopic helps
+    assert mpc.total_pnl <= lp.total_pnl + 1e-6                        # can't beat optimum
+    assert mpc.total_pnl >= 0.8 * lp.total_pnl                         # and gets most of it
+
+
 def test_confidence_sizing_is_monotonic_and_capped():
     """Bigger edge -> bigger (or equal) size, never above full power."""
     full = BATT.max_energy_per_period_kwh

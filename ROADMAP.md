@@ -48,9 +48,12 @@ Status: `decision.py` (heuristic edge-vs-cost policy, with confidence-proportion
 trade sizing) + `simulate.py` (enforces all listed constraints). Horizon and sizing are
 tuned on validation. `optimize.py` adds a **perfect-foresight LP dispatch** (HiGHS) that
 respects every constraint — the **true upper bound**. Across 2 years the tuned ML policy
-captures **56% of the LP optimum** (vs 72% of the weaker myopic reference); the ML→LP gap
-motivates a **receding-horizon (MPC)** policy that feeds forecasts into the LP — the next
-step, and the way to turn the forecast into a near-optimal *causal* strategy.
+captures **56% of the LP optimum** (vs 72% of the weaker myopic reference). `mpc.py` adds
+a **receding-horizon (MPC)** policy feeding the forecast path into the rolling LP. Key
+finding: with an oracle path it reaches ~LP, but with the *real* forecast it UNDERPERFORMS
+the myopic heuristic — feeding a point forecast into an LP amplifies forecast error. The
+lesson (accuracy ≠ P&L; optimisation only pays with a good, uncertainty-aware forecast)
+points to **robust/stochastic MPC** as the real next step, not more point-forecast tuning.
 
 ### 4. Measure the commercial outcome
 Aim to be able to say: "Backtested across X months, £X/MWh average gross value,

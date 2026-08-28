@@ -30,6 +30,16 @@ def forward_arbitrage_edge(df: pd.DataFrame, efficiency: float, horizon: int = 1
     return future_sell * efficiency - df["SystemBuyPrice"]
 
 
+def forward_price_path(df: pd.DataFrame, window: int, price_col: str = "SystemSellPrice"):
+    """Multi-output target for MPC: the price *change* at each of the next ``window``
+    periods, ``[SSP(t+1)-SSP(t), ..., SSP(t+W)-SSP(t)]``. Predicting these and adding the
+    current price reconstructs a forecast price path to plan the rolling LP over."""
+    cur = df[price_col]
+    return pd.concat(
+        {f"d{k}": cur.shift(-k) - cur for k in range(1, window + 1)}, axis=1
+    )
+
+
 def forward_direction(df: pd.DataFrame, horizon: int = 1, price_col: str = "SystemSellPrice"):
     """Classification target: sign of the forward price change (-1 / 0 / +1)."""
     return np.sign(forward_price_change(df, horizon, price_col)).astype("Int64")
