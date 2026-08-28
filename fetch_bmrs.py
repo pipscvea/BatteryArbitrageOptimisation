@@ -84,6 +84,46 @@ def fetch_demand(start: date, end: date, chunk_days: int = 14) -> list[dict]:
     return [rows[k] for k in sorted(rows)]
 
 
+def fetch_generation(start: date, end: date, chunk_days: int = 5) -> list[dict]:
+    """Fuel-mix drivers from generation/outturn/summary (5-min FUELINST), aggregated to
+    30-min settlement periods. Returns Wind (MW), net interconnector flow (MW, +=import)
+    and Gas/CCGT (MW) — the fundamentals that move short-term GB prices."""
+    import pandas as pd  # local import; only needed when fetching generation
+
+    recs: list[dict] = []
+    d = start
+    while d <= end:
+        chunk_end = min(d + timedelta(days=chunk_days - 1), end)
+        url = (f"{BASE}/generation/outturn/summary"
+               f"?startTime={d.isoformat()}T00:00Z"
+               f"&endTime={(chunk_end + timedelta(days=1)).isoformat()}T00:00Z&format=json")
+        for period in _get(url):
+            row = {"StartTime": period["startTime"]}
+            inter = 0.0
+            for item in period["data"]:
+                ft, gen = item["fuelType"], item["generation"]
+                if ft == "WIND":
+                    row["Wind"] = gen
+                elif ft == "CCGT":
+                    row["Gas"] = gen
+                elif ft.startswith("INT"):
+                    inter += gen
+            row["InterconnectorNet"] = inter
+            recs.append(row)
+        d = chunk_end + timedelta(days=1)
+        time.sleep(0.1)
+
+    if not recs:
+        return []
+    s = pd.DataFrame(recs)
+    s["StartTime"] = pd.to_datetime(s["StartTime"])
+    # 5-min -> 30-min settlement periods (mean of instantaneous MW).
+    agg = (s.set_index("StartTime").resample("30min").mean().dropna(how="all")
+           .reset_index())
+    agg["StartTime"] = agg["StartTime"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return agg.round(1).to_dict("records")
+
+
 def _write_csv(rows: list[dict], path: Path, fieldnames: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", newline="") as f:
@@ -111,6 +151,11 @@ def main() -> None:
     demand = fetch_demand(start, end)
     _write_csv(demand, ROOT / "RollingSystemDemand" / f"RollingSystemDemand-{tag}.csv",
                ["StartTime", "Demand"])
+
+    print(f"Fetching generation drivers {tag} ...")
+    gen = fetch_generation(start, end)
+    _write_csv(gen, ROOT / "Drivers" / f"Drivers-{tag}.csv",
+               ["StartTime", "Wind", "InterconnectorNet", "Gas"])
 
 
 if __name__ == "__main__":

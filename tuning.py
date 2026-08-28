@@ -14,7 +14,7 @@ import pandas as pd
 
 from config import BatteryConfig, TradingConfig
 from evaluate import evaluate
-from features import FEATURE_COLUMNS
+from features import active_feature_columns
 from forecasting import fit_regressor
 from labels import forward_price_change
 from simulate import simulate
@@ -38,7 +38,7 @@ def sweep(df: pd.DataFrame, feats: pd.DataFrame, batt: BatteryConfig, trade: Tra
           horizons=DEFAULT_HORIZONS, size_scales=DEFAULT_SIZE_SCALES):
     """Return ``(best_row, all_rows)`` ranked by validation P&L. One quick RF fit per
     horizon (sizing is applied at decision time, so it needs no refit)."""
-    X_all = feats[FEATURE_COLUMNS]
+    X_all = feats[active_feature_columns(feats)]
     rows: list[SweepRow] = []
 
     for h in horizons:

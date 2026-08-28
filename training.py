@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from config import load_battery_config
 from data_pipeline import assemble_market_data
-from features import FEATURE_COLUMNS, build_features
+from features import active_feature_columns, build_features
 from forecasting import train_regressor, train_classifier
 from labels import forward_price_change, tradeable_move
 
@@ -19,7 +19,7 @@ def main():
     batt = load_battery_config()
     df = assemble_market_data()
     feats = build_features(df)
-    X = feats[FEATURE_COLUMNS]
+    X = feats[active_feature_columns(feats)]
     valid_idx = X.index[X.notna().all(axis=1)]
     train_idx = valid_idx[: int(len(valid_idx) * TRAIN_FRAC)]
 
