@@ -71,8 +71,14 @@ clear weak regime (10% capture). Still to compare: statistical vs ML vs optimisa
 Beyond P&L: volatility, max drawdown, downside risk, exposure, VaR, stress scenarios,
 sensitivity to forecast errors, performance in extreme volatility.
 
-Status: `evaluate.py` computes historical VaR + drawdown. Stress scenarios and
-forecast-error sensitivity are planned (`risk.py`, not yet built).
+Status: `risk.py` computes VaR, **CVaR/expected shortfall**, Sortino, downside deviation,
+drawdown depth **and duration**, skew/kurtosis, exposure; runs a **forecast-error
+sensitivity** sweep (P&L vs injected forecast noise) and a **regime stress** attribution
+(high/low volatility, price spikes, negative prices). On 2024 test data: Sharpe ~16,
+Sortino ~21, fat right tail (skew +1.4, kurtosis 13); price spikes (15% of periods)
+generate ~67% of P&L; **negative-price periods LOSE money (−24% of P&L)** — a concrete
+fix target; P&L decays to zero at ~£80/MWh forecast noise. Still to add: VaR term
+structure, explicit extreme-scenario replays.
 
 ## What is deliberately NOT done yet
 - No live/real performance numbers — the CSVs (`SystemSellAndBuyPrices/`,
