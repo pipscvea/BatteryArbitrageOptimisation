@@ -22,7 +22,9 @@ Forecast something *commercially meaningful*, not just "next price":
 
 Status: `labels.py` defines forward-looking targets incl. a probabilistic
 `tradeable_move` classifier target. Regression + directional targets implemented.
-Probabilistic calibration is the priority extension.
+The forecast **horizon is tuned on a validation window** (`tuning.py`) — a battery
+arbitrages the daily swing, so h=1 is the wrong lever; the sweep selects it by
+commercial P&L. Probabilistic calibration is the next extension.
 
 ### 2. Identify market drivers
 Make it Market Analysis & Trading, not generic ML. Candidate drivers:
@@ -39,8 +41,10 @@ Not `forecast = £X/MWh`, but `forecast distribution → expected opportunity �
 subject to: capacity, SoC, charge/discharge efficiency, max power, degradation cost,
 transaction cost, min/max SoC, and (ideally) forecast uncertainty.
 
-Status: `decision.py` (heuristic edge-vs-cost policy) + `simulate.py` (enforces all
-listed constraints). Optimisation-based dispatch (LP/MPC) is a planned alternative policy.
+Status: `decision.py` (heuristic edge-vs-cost policy, with confidence-proportional
+trade sizing) + `simulate.py` (enforces all listed constraints). Horizon and sizing are
+tuned on validation. Optimisation-based dispatch (LP/MPC) — which would also give a true
+optimal-dispatch upper bound — is the planned alternative policy.
 
 ### 4. Measure the commercial outcome
 Aim to be able to say: "Backtested across X months, £X/MWh average gross value,

@@ -1,20 +1,17 @@
 """Stage 1-5 orchestrator — the honest, out-of-sample backtest.
 
-Fixes the core leakage bug in the old ``apply_model.py`` (which predicted over the WHOLE
-dataset, train + test). Here:
-  * features look backward, the label looks forward (see features.py / labels.py)
-  * the split is strictly chronological — train on the earlier window, evaluate ONLY on
-    the later, unseen window
-  * the ML strategy is reported alongside a perfect-foresight *myopic* reference and a
-    naive baseline, all on the SAME test window, so the headline is commercial value, not
-    forecast accuracy. (A true optimal-dispatch upper bound via LP/DP is Stage 3 work.)
+Three-way chronological split: train | validation | test.
+  * Stage 1 forecast + Stage 3 decision are TUNED on validation (horizon & trade sizing),
+    never on test (see tuning.py).
+  * the final model is refit on train+validation, then evaluated ONLY on the unseen test
+    window, alongside a perfect-foresight *myopic* reference and a naive baseline.
+The headline is commercial value after costs and risk, not forecast accuracy.
 
-Requires the market CSVs (see README) — will not run on the cloned repo alone. The
+Requires the market CSVs — fetch them with ``python fetch_bmrs.py`` (see README). The
 plumbing is verified independently on synthetic data in tests/.
 """
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
 
@@ -26,44 +23,50 @@ from forecasting import train_regressor, train_classifier, feature_importances
 from strategy import model_requests
 from simulate import simulate
 from evaluate import evaluate
+from tuning import sweep
 import benchmarks
 
-HORIZON = 1
-TEST_FRAC = 0.2
+TRAIN_FRAC, VAL_FRAC = 0.6, 0.2  # remainder is test
 
 
-def chronological_split(index: pd.Index, test_frac: float = TEST_FRAC):
-    cut = int(len(index) * (1 - test_frac))
-    return index[:cut], index[cut:]
-
-
-def prepare(df: pd.DataFrame, batt):
-    feats = build_features(df)
-    y_change = forward_price_change(df, HORIZON)
-    y_move = tradeable_move(df, batt.efficiency_one_way, edge_threshold=0.0, horizon=HORIZON)
-    X = feats[FEATURE_COLUMNS]
-    valid = X.notna().all(axis=1) & y_change.notna()
-    return X[valid], y_change[valid], y_move[valid]
+def three_way_split(index: pd.Index):
+    n = len(index)
+    a, b = int(n * TRAIN_FRAC), int(n * (TRAIN_FRAC + VAL_FRAC))
+    return index[:a], index[a:b], index[b:]
 
 
 def run():
     batt, trade = load_battery_config(), load_trading_config()
     df = assemble_market_data()
-    X, y_change, y_move = prepare(df, batt)
-    train_idx, test_idx = chronological_split(X.index)
+    feats = build_features(df)
+    valid_idx = feats.index[feats[FEATURE_COLUMNS].notna().all(axis=1)]
+    train_idx, val_idx, test_idx = three_way_split(valid_idx)
 
-    # Stage 1: forecast (regressor drives decisions; classifier gives P(tradeable move)).
-    reg, _, _ = train_regressor(X.loc[train_idx], y_change.loc[train_idx])
-    clf, _, _ = train_classifier(X.loc[train_idx], y_move.loc[train_idx])
+    # Stage 3 tuning on validation (never on test).
+    best, rows = sweep(df, feats, batt, trade, train_idx, val_idx)
+    print("Horizon x sizing sweep (validation P&L):")
+    print(f"{'horizon':>8}{'size_scale':>12}{'val P&L £':>12}{'Sharpe':>9}{'trades':>8}")
+    for r in rows[:8]:
+        print(f"{r.horizon:>8}{r.size_scale:>12.0f}{r.total_pnl:>12,.0f}{r.sharpe:>9.2f}{r.n_trades:>8}")
+    print(f"-> chosen: horizon={best.horizon}, size_scale={best.size_scale}\n")
+
+    # Final fit on train+validation at the chosen horizon; evaluate on test only.
+    fit_idx = train_idx.union(val_idx)
+    X = feats[FEATURE_COLUMNS]
+    y_change = forward_price_change(df, best.horizon)
+    y_move = tradeable_move(df, batt.efficiency_one_way, 0.0, best.horizon)
+    fit_valid = fit_idx[y_change.loc[fit_idx].notna()]
+    reg, _, _ = train_regressor(X.loc[fit_valid], y_change.loc[fit_valid])
+    clf, _, _ = train_classifier(X.loc[fit_valid], y_move.loc[fit_valid])
     auc = roc_auc_score(y_move.loc[test_idx], clf.predict_proba(X.loc[test_idx])[:, 1])
 
-    # Stages 3-5, TEST WINDOW ONLY.
     df_test = df.loc[test_idx]
     ssp, sbp = df_test["SystemSellPrice"], df_test["SystemBuyPrice"]
-
     strategies = {
-        "ML forecast": model_requests(reg, X.loc[test_idx], df_test, batt, trade),
-        "Perfect-foresight myopic rule": benchmarks.perfect_foresight_myopic(df_test, batt, trade, HORIZON),
+        "ML forecast (tuned)": model_requests(reg, X.loc[test_idx], df_test, batt, trade,
+                                              size_scale=best.size_scale),
+        "Perfect-foresight myopic rule": benchmarks.perfect_foresight_myopic(
+            df_test, batt, trade, best.horizon),
         "Naive time-of-day": benchmarks.naive_time_of_day(df_test, batt),
     }
 

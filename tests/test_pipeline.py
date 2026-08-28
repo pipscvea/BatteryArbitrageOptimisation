@@ -100,3 +100,13 @@ def test_decision_gates_on_min_edge():
     d_big = decide(80.0, 50.0, 51.0, BATT, TRADE)
     assert d_small.request_kwh == 0.0
     assert d_big.request_kwh > 0.0
+
+
+def test_confidence_sizing_is_monotonic_and_capped():
+    """Bigger edge -> bigger (or equal) size, never above full power."""
+    full = BATT.max_energy_per_period_kwh
+    weak = decide(20.0, 50.0, 51.0, BATT, TRADE, size_scale=30.0)
+    strong = decide(200.0, 50.0, 51.0, BATT, TRADE, size_scale=30.0)
+    assert 0.0 < weak.request_kwh < strong.request_kwh <= full + 1e-9
+    # size_scale=0 restores all-or-nothing at full power.
+    assert decide(20.0, 50.0, 51.0, BATT, TRADE, size_scale=0.0).request_kwh == full
