@@ -8,7 +8,10 @@ benchmarks.
 
 The guiding question is *not* "how accurate is the price forecast?" but:
 **does the forecast produce a commercially useful signal after constraints, costs and
-risk?** See [ROADMAP.md](ROADMAP.md) for the five-stage plan and what is / isn't built.
+risk?**
+
+📊 **[RESULTS.md](RESULTS.md)** — headline results, findings and figures (start here).
+🗺️ **[ROADMAP.md](ROADMAP.md)** — the five-stage plan and what is / isn't built.
 
 ## Pipeline
 
