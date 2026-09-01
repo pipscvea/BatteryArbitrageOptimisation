@@ -103,9 +103,12 @@ def forecast_error_sensitivity(forecast: pd.Series, df: pd.DataFrame, batt: Batt
 
 
 def stress_by_regime(res: SimResult, df: pd.DataFrame) -> pd.DataFrame:
-    """Attribute realised per-period P&L to market regimes. Uses the ML sim's period P&L
-    (SoC-consistent) grouped by regime masks, so it shows where value is made/lost."""
-    pnl = res.period_pnl()
+    """Attribute P&L to market regimes. Reports REALISED cash flow separately from
+    mark-to-market, because MtM revaluation of held inventory can make a *correct* action
+    look like a loss — e.g. charging at negative prices earns positive cash while the
+    stored energy's MtM value falls. Realised cash flow is the honest 'did trading earn'."""
+    realized = res.realized_pnl()
+    mtm = res.period_pnl() - realized
     mid = (df["SystemSellPrice"] + df["SystemBuyPrice"]) / 2
     vol = mid.diff().abs().rolling(48).std()
     hi_vol = vol > vol.median()
@@ -116,15 +119,16 @@ def stress_by_regime(res: SimResult, df: pd.DataFrame) -> pd.DataFrame:
         "negative price": df["SystemSellPrice"] < 0,
         "all periods": pd.Series(True, index=df.index),
     }
+    total_real = realized.sum()
     rows = []
     for name, mask in regimes.items():
-        m = mask.reindex(pnl.index).fillna(False)
-        seg = pnl[m]
+        m = mask.reindex(realized.index).fillna(False)
         rows.append({
             "regime": name, "periods": int(m.sum()),
-            "total_pnl": float(seg.sum()),
-            "pnl_per_period": float(seg.mean()) if len(seg) else 0.0,
-            "share_of_pnl": float(seg.sum() / pnl.sum()) if pnl.sum() else float("nan"),
+            "realized_pnl": float(realized[m].sum()),
+            "mtm_pnl": float(mtm[m].sum()),
+            "realized_per_period": float(realized[m].mean()) if m.sum() else 0.0,
+            "share_of_realized": float(realized[m].sum() / total_real) if total_real else float("nan"),
         })
     return pd.DataFrame(rows)
 

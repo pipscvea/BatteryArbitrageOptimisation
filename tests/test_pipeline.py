@@ -177,9 +177,22 @@ def test_risk_metrics_are_coherent():
     assert 0.0 <= rm.max_drawdown <= 1.0
     assert 0.0 <= rm.exposure <= 1.0
     reg = stress_by_regime(res, df)
-    # Regime P&L shares (excluding the 'all periods' row) sum to ~1.
-    parts = reg[reg.regime != "all periods"]
-    assert abs(parts[parts.regime.isin(["high volatility", "low volatility"])].share_of_pnl.sum() - 1.0) < 1e-6
+    # high + low volatility partition all periods, so their realised-P&L shares sum to ~1.
+    hilo = reg[reg.regime.isin(["high volatility", "low volatility"])]
+    assert abs(hilo.share_of_realized.sum() - 1.0) < 1e-6
+
+
+def test_charging_at_negative_price_is_positive_realised_cash():
+    """Charging when prices are negative earns positive realised cash flow, even though the
+    stored energy's mark-to-market value is negative. This is why regime attribution must
+    split realised from MtM (the 'negative-price loss' was an MtM artifact, not a bug)."""
+    idx = pd.date_range("2024-01-01", periods=4, freq="30min")
+    df = pd.DataFrame({"SystemSellPrice": [-50.0] * 4, "SystemBuyPrice": [-49.0] * 4}, index=idx)
+    charge = pd.Series(BATT.max_energy_per_period_kwh, index=idx)  # charge every period
+    res = simulate(charge, df["SystemSellPrice"], df["SystemBuyPrice"], BATT, TRADE)
+    realized = res.realized_pnl()
+    assert realized.sum() > 0                       # got paid to charge -> positive cash
+    assert res.period_pnl().sum() < realized.sum()  # MtM of held energy drags equity down
 
 
 def test_forecast_error_sensitivity_baseline_matches():

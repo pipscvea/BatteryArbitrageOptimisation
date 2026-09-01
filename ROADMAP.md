@@ -74,11 +74,13 @@ sensitivity to forecast errors, performance in extreme volatility.
 Status: `risk.py` computes VaR, **CVaR/expected shortfall**, Sortino, downside deviation,
 drawdown depth **and duration**, skew/kurtosis, exposure; runs a **forecast-error
 sensitivity** sweep (P&L vs injected forecast noise) and a **regime stress** attribution
-(high/low volatility, price spikes, negative prices). On 2024 test data: Sharpe ~16,
-Sortino ~21, fat right tail (skew +1.4, kurtosis 13); price spikes (15% of periods)
-generate ~67% of P&L; **negative-price periods LOSE money (−24% of P&L)** — a concrete
-fix target; P&L decays to zero at ~£80/MWh forecast noise. Still to add: VaR term
-structure, explicit extreme-scenario replays.
+(high/low volatility, price spikes, negative prices), attributing **realised cash flow
+separately from mark-to-market**. On 2024 test data: Sharpe ~16, Sortino ~21, fat right
+tail (skew +1.4, kurtosis 13); price spikes (15% of periods) generate ~64% of realised
+P&L. Negative-price periods earn **positive realised cash (+£0.5k)** — the strategy
+correctly charges when paid to consume — while their −£7.7k mark-to-market is a transient
+inventory revaluation, not a loss (an earlier MtM-inclusive view misread this). P&L decays
+to zero at ~£80/MWh forecast noise. Still to add: VaR term structure, extreme-scenario replays.
 
 ## What is deliberately NOT done yet
 - No live/real performance numbers — the CSVs (`SystemSellAndBuyPrices/`,
