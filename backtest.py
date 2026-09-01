@@ -21,7 +21,7 @@ from features import active_feature_columns, build_features
 from labels import forward_price_change, tradeable_move, forward_price_path
 from forecasting import train_regressor, train_classifier, feature_importances, fit_path_regressor
 from strategy import model_requests
-from mpc import mpc_requests
+from mpc import mpc_requests, diurnal_climatology
 from simulate import simulate
 from evaluate import evaluate
 from tuning import sweep
@@ -64,18 +64,36 @@ def run():
     clf, _, _ = train_classifier(X.loc[fit_valid], y_move.loc[fit_valid])
     auc = roc_auc_score(y_move.loc[test_idx], clf.predict_proba(X.loc[test_idx])[:, 1])
 
-    # Price-path model for MPC (drop tail rows lacking a full forward path).
+    # Price-path model for MPC (drop tail rows lacking a full forward path). Train on the
+    # TRAIN window only so the decay can be tuned on validation without leakage.
     Y_path = forward_price_path(df, MPC_WINDOW)
-    path_valid = fit_idx[Y_path.loc[fit_idx].notna().all(axis=1)]
-    path_model = fit_path_regressor(X.loc[path_valid], Y_path.loc[path_valid])
+    train_path = train_idx[Y_path.loc[train_idx].notna().all(axis=1)]
+    path_model = fit_path_regressor(X.loc[train_path], Y_path.loc[train_path])
+
+    # Robust MPC: blend the forecast toward the diurnal climatology (fit on TRAIN only) at
+    # far horizons. Tune the decay on the VALIDATION window (cheap — reuses the path fit).
+    clim = diurnal_climatology(df.loc[train_path])
+    dfv = df.loc[val_idx]
+    vssp, vsbp = dfv["SystemSellPrice"], dfv["SystemBuyPrice"]
+    best_decay, best_decay_pnl = 1.0, -1e18
+    for d in (1.0, 0.9, 0.8, 0.6, 0.4, 0.2):
+        req = mpc_requests(path_model, X.loc[val_idx], dfv, batt, trade,
+                           MPC_WINDOW, MPC_REPLAN, horizon_decay=d, climatology=clim)
+        pnl = evaluate(simulate(req, vssp, vsbp, batt, trade), batt).total_pnl
+        if pnl > best_decay_pnl:
+            best_decay, best_decay_pnl = d, pnl
+    print(f"Robust-MPC horizon_decay chosen on validation: {best_decay}\n")
 
     df_test = df.loc[test_idx]
     ssp, sbp = df_test["SystemSellPrice"], df_test["SystemBuyPrice"]
     strategies = {
         "ML forecast (myopic heuristic)": model_requests(reg, X.loc[test_idx], df_test, batt, trade,
                                               size_scale=best.size_scale),
-        "MPC (forecast + rolling LP)": mpc_requests(path_model, X.loc[test_idx], df_test,
+        "MPC (plain, decay=1.0)": mpc_requests(path_model, X.loc[test_idx], df_test,
                                               batt, trade, MPC_WINDOW, MPC_REPLAN),
+        f"MPC (robust, decay={best_decay})": mpc_requests(path_model, X.loc[test_idx], df_test,
+                                              batt, trade, MPC_WINDOW, MPC_REPLAN,
+                                              horizon_decay=best_decay, climatology=clim),
         "LP optimum (true upper bound)": optimal_dispatch(df_test, batt, trade),
         "Perfect-foresight myopic rule": benchmarks.perfect_foresight_myopic(
             df_test, batt, trade, best.horizon),

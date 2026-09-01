@@ -51,9 +51,14 @@ respects every constraint — the **true upper bound**. Across 2 years the tuned
 captures **56% of the LP optimum** (vs 72% of the weaker myopic reference). `mpc.py` adds
 a **receding-horizon (MPC)** policy feeding the forecast path into the rolling LP. Key
 finding: with an oracle path it reaches ~LP, but with the *real* forecast it UNDERPERFORMS
-the myopic heuristic — feeding a point forecast into an LP amplifies forecast error. The
-lesson (accuracy ≠ P&L; optimisation only pays with a good, uncertainty-aware forecast)
-points to **robust/stochastic MPC** as the real next step, not more point-forecast tuning.
+the myopic heuristic — feeding a point forecast into an LP amplifies forecast error.
+`mpc.py` also adds a **robust MPC** knob (`horizon_decay` + an optional diurnal-climatology
+prior) that blends the forecast toward a prior at far horizons. Tested honestly: shrinking
+toward *persistence* hurts (it removes the daily swing the battery arbitrages); shrinking
+toward the *climatology* stops the bleeding but still does not beat plain MPC — validation
+selects `decay=1.0`. Conclusion: at this forecast quality, horizon-trust robustification
+does **not** close the gap; the real levers are a better/calibrated forecast or a
+**chance-constrained / scenario-based stochastic** LP over a forecast *distribution*.
 
 ### 4. Measure the commercial outcome
 Aim to be able to say: "Backtested across X months, £X/MWh average gross value,
