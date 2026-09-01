@@ -38,11 +38,22 @@ class SimResult:
         return pd.Series(self.equity, index=self.index)
 
     def period_pnl(self) -> pd.Series:
-        """Per-period change in equity (£) — the P&L used for risk metrics."""
+        """Per-period change in equity (£) — realised cash flow PLUS the change in
+        mark-to-market value of stored energy. Used for risk metrics."""
         eq = self.equity_series()
         if eq.empty:
             return eq
         return eq.diff().fillna(eq.iloc[0] - self.starting_balance)
+
+    def realized_pnl(self) -> pd.Series:
+        """Per-period REALISED cash flow (£), excluding mark-to-market revaluation of
+        held inventory. This is the honest 'what did trading earn this period' series —
+        e.g. charging at a negative price is a positive realised cash flow even though the
+        stored energy's MtM value is negative."""
+        cash = pd.Series(self.cash, index=self.index)
+        if cash.empty:
+            return cash
+        return cash.diff().fillna(cash.iloc[0])
 
 
 def simulate(requests_kwh, prices_sell, prices_buy, batt: BatteryConfig,
