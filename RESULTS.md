@@ -89,8 +89,13 @@ sophisticated policy — *underperformed the simple edge heuristic* and barely b
 Feeding a **point** forecast into an optimiser makes it over-confident: it commits fully to
 forecast paths that are wrong, and the errors compound. With a *perfect* forecast the same
 MPC reaches the LP optimum (verified), so the machinery is right — the limitation is
-forecast quality, not the optimiser. The lesson: **optimisation only pays once the forecast
-is good and its uncertainty is respected.**
+forecast quality, not the optimiser. A **robust MPC** (blending the forecast toward a prior
+at far horizons — persistence, then the diurnal climatology) was then tried and *tuned on
+validation*: it does **not** recover the gap (validation selects no blending). At this
+forecast quality the selective heuristic wins, and horizon-trust shrinkage is the wrong
+knob — the real levers are a better/calibrated forecast or a chance-constrained /
+scenario-based stochastic LP. The lesson: **optimisation only pays once the forecast is
+good and its uncertainty is properly modelled.**
 
 **2. Forecast accuracy ≠ P&L, quantified.** Injecting Gaussian noise into the forecast
 degrades P&L smoothly to zero at ~£80/MWh of noise — a direct, monetised measure of how

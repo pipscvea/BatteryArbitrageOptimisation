@@ -165,6 +165,47 @@ def test_mpc_with_oracle_approaches_optimum_and_is_feasible():
     assert mpc.total_pnl >= 0.8 * lp.total_pnl                         # and gets most of it
 
 
+def test_robust_mpc_shrink_is_feasible_and_defaults_to_plain():
+    """horizon_decay=1.0 must reproduce plain MPC; shrinking a PERFECT forecast can only
+    reduce P&L (never help); the schedule stays feasible."""
+    from optimize import optimal_dispatch
+    from mpc import mpc_requests
+    W = 48
+    df = make_market(days=20, seed=7)
+    ssp, sbp = df["SystemSellPrice"], df["SystemBuyPrice"]
+    cur = ssp.to_numpy(); T = len(cur)
+    truth = np.zeros((T, W))
+    for k in range(1, W + 1):
+        truth[:, k - 1] = np.concatenate([cur[k:], np.zeros(k)]) - cur
+
+    class Oracle:
+        def predict(self, _X):
+            return truth
+
+    X = df[["SystemSellPrice"]]
+    plain = mpc_requests(Oracle(), X, df, BATT, TRADE, window=W, replan_every=12)
+    explicit1 = mpc_requests(Oracle(), X, df, BATT, TRADE, window=W, replan_every=12, horizon_decay=1.0)
+    robust = mpc_requests(Oracle(), X, df, BATT, TRADE, window=W, replan_every=12, horizon_decay=0.6)
+
+    pd.testing.assert_series_equal(plain, explicit1)             # decay=1.0 == plain
+    assert robust.abs().max() <= BATT.max_energy_per_period_kwh + 1e-6  # feasible
+    p_plain = evaluate(simulate(plain, ssp, sbp, BATT, TRADE), BATT).total_pnl
+    p_robust = evaluate(simulate(robust, ssp, sbp, BATT, TRADE), BATT).total_pnl
+    assert p_robust <= p_plain + 1e-6                            # shrinking perfect info can't help
+    assert p_robust >= 0                                          # but still never loses with foresight
+
+    # Climatology prior: at decay=1.0 the prior is ignored (== plain); it stays feasible when active.
+    from mpc import diurnal_climatology
+    clim = diurnal_climatology(df)
+    assert clim.shape == (48,) and np.isfinite(clim).all()
+    same = mpc_requests(Oracle(), X, df, BATT, TRADE, window=W, replan_every=12,
+                        horizon_decay=1.0, climatology=clim)
+    pd.testing.assert_series_equal(plain, same)
+    blended = mpc_requests(Oracle(), X, df, BATT, TRADE, window=W, replan_every=12,
+                           horizon_decay=0.6, climatology=clim)
+    assert blended.abs().max() <= BATT.max_energy_per_period_kwh + 1e-6
+
+
 def test_risk_metrics_are_coherent():
     """CVaR >= VaR, drawdown in [0,1], exposure in [0,1], everything finite."""
     from risk import extended_risk, stress_by_regime
