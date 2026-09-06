@@ -35,6 +35,40 @@ evaluates strictly on the later, unseen window — unlike the original code, whi
 predicted over the whole dataset. This is verified in `tests/test_pipeline.py`
 (`test_features_have_no_lookahead`).
 
+## Data & forecast
+
+**Data** — all from the free, keyless [Elexon BMRS Insights API](https://bmrs.elexon.co.uk/)
+(`fetch_bmrs.py`); headline runs use **2 years, 2023–2024, half-hourly** (~35,000 settlement
+periods):
+
+| Signal | BMRS dataset | What it is |
+|---|---|---|
+| System Sell / Buy Price | DISEBSP | GB electricity **imbalance (cash-out) prices**, £/MWh — the traded price |
+| Demand | ITSDO (`demand/outturn`) | Transmission system demand, MW |
+| Wind | FUELINST (`generation/outturn/summary`) | Wind generation, MW |
+| Interconnector flow | FUELINST | Net flow across all interconnectors (INTFR, INTNED, …), MW |
+| Gas | FUELINST | CCGT generation, MW |
+
+From these, `features.py` builds **backward-only** features: price lags / rolling
+mean & std / spread / volatility, demand lags & rolling stats, calendar (hour, day-of-week,
+month, weekend), and wind level/lag/moving-average/**ramp** + interconnector + gas.
+
+**What the model forecasts** — the label is the *only* forward-looking quantity (which is
+what keeps the backtest leak-free). Three targets, all predicted from past-only features:
+
+1. **Forward price change** — `SystemSellPrice(t+h) − SystemSellPrice(t)` over a tuned
+   horizon (default **h = 4**, ~2 h ahead). A random forest predicts this; the decision
+   layer turns it into an expected arbitrage **edge**. *This is the target that drives trading.*
+2. **P(tradeable move)** — a classifier estimating "does the next period offer a spread
+   large enough to justify a trade?" (`predict_proba`, ≈0.78 AUC out-of-sample).
+3. **Forward price *path*** — a multi-output regressor over the next 48 periods, used only
+   to feed the LP/MPC dispatch.
+
+The model forecasts **short-term price/imbalance opportunities — not the battery actions**.
+A separate decision/optimisation layer converts the forecast into charge/discharge subject
+to the operating constraints. Success is measured as **commercial value after costs and
+risk**, not forecast accuracy (see the anti-goal in [ROADMAP.md](ROADMAP.md)).
+
 ## Setup
 
 ```bash
