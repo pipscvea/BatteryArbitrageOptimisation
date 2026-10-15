@@ -20,3 +20,6 @@ __pycache__/
 # Trained model artifacts (retrain locally with training.py)
 forecast_regressor.joblib
 forecast_classifier.joblib
+
+# Generated PDF report (regenerate with docs/build_report.py)
+docs/*.pdf
